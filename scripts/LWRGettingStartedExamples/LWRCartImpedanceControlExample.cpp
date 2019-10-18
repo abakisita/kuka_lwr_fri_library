@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
 	auto event_in_sub = node->create_subscription<std_msgs::msg::String>("/event_in", 100, event_in_cb);
 
     // ROBOT AND FRI INITILIZATION
-	Robot	=	new LWRCartImpedanceController("/home/padalkar/FRILibrary/src/FastResearchInterfaceLibrary/config/980039-FRI-Driver.init");
+	Robot	=	new LWRCartImpedanceController("/home/lwr-station/ros2/src/kuka_lwr_fri_library/config/980039-FRI-Driver.init");
 	fprintf(stdout, "RobotCartImpedanceController object created. Starting the robot...\n");
 	ResultValue	=	Robot->StartRobot();
 	if (ResultValue == EOK)

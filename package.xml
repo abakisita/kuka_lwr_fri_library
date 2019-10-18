@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>FastResearchInterfaceLibrary</name>
+  <name>kuka_lwr_fri_library</name>
   <version>0.0.0</version>
   <description>The fri_catkin package</description>
 
