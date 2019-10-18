@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="wrench_plot" pkg="rqt_plot" type="rqt_plot" output="screen" 
+        args="/wrench/wrench/force /wrench/wrench/torque"/>
+  <node name="reward_plot" pkg="rqt_multiplot" type="rqt_multiplot" output="screen"/>
+
+</launch>

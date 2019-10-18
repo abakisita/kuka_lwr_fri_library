@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node name="calibration_node" pkg="FastResearchInterfaceLibrary" type="calibration_node" output="screen" launch-prefix="pkexec" >
+  </node>
+</launch>
