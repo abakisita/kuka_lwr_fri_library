@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(FastResearchInterfaceLibrary)
+project(kuka_lwr_fri_library)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # Default to C++14
@@ -37,12 +37,12 @@ endif()
 
 
 ## DEPENDS: system dependencies of this project that dependent projects also need
-ament_package(
+#ament_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES FastResearchInterfaceLibrary
 #  CATKIN_DEPENDS roscpp std_msgs
 #  DEPENDS system_lib
-)
+#)
 
 ## Your package locations should be listed before other locations
 include_directories(
@@ -112,10 +112,11 @@ add_executable(cart_test_2_node scripts/LWRGettingStartedExamples/LWRCartImpedan
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(FastResearchInterfaceLibrary
+ target_link_libraries(${PROJECT_NAME}
+
    pthread
  )
- target_link_libraries(FastResearchInterfaceLibrary
+ target_link_libraries(${PROJECT_NAME}
    pthread
  )
 # target_link_libraries(cart_test_node
@@ -150,7 +151,7 @@ add_executable(cart_test_2_node scripts/LWRGettingStartedExamples/LWRCartImpedan
  #)
 
  target_link_libraries(cart_test_2_node
-   FastResearchInterfaceLibrary
+	 ${PROJECT_NAME}
    TypeIRML
    
  #  rclcpp
@@ -185,11 +186,11 @@ ament_target_dependencies(cart_test_2_node
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
+ install(TARGETS cart_test_2_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+	DESTINATION lib/${PROJECT_NAME}
+	RUNTIME DESTINATION lib/${PROJECT_NAME}
+ )
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/
@@ -217,3 +218,4 @@ ament_target_dependencies(cart_test_2_node
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+ament_package()
