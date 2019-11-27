@@ -36,108 +36,6 @@
 #define RUN_TIME_IN_SECONDS			10800.0
 
 
-
-void state_coordinator()
-{
-	int i = 0;
-	episode_data.clear();
-	while (true)
-	{
-		single_time_step_data.clear();
-		roll_out_data.clear();
-		// Update policy params
-		if (not policy_params_updated)
-		{
-			policy.update_params(updated_policy_params[0], updated_policy_params[1], updated_policy_params[2]);
-			policy_params_updated = true;
-			std::cout << "Updated policy parameters" << std::endl;
-			std::cout << "New policy params " << policy.A << " " << policy.B << " " << policy.C << std::endl;
-		}
-		if (start_execution and policy_params_updated)
-		{
-
-			start_execution = false;
-			// Go to start
-			std::cout << "GOING TO START" << std::endl;
-			execution_finished = false;
-			setup_original_pose();
-			setup_new_start_pose();
-			task_mode = GO_TO_START;
-			while (!execution_finished)
-			{
-				usleep(1000);
-			}
-			std::cout << "Robot at start position" << std::endl << std::endl;
-			usleep(2000000);
-
-			// Positioning robot above the vegetable
-			std::cout << "POSITIONING THE ROBOT" << std::endl;
-			execution_finished = false;
-			setup_original_pose();
-			task_mode = POSITIONING;
-			while (!execution_finished)
-			{
-				usleep(1000);
-			}
-			std::cout << "FINISHED POSITIONING THE ROBOT" << std::endl << std::endl;
-			usleep(2000000);
-
-			// Touching down until some force is felt at TCP
-			std::cout << "TOUCH DOWN" << std::endl;
-			execution_finished = false;
-			setup_touch_down(-0.10, 0.01);
-			setup_original_pose();
-			// std::cout << target_linear_pos[2] << " " << MeasuredPose[11] << std::endl;
-			task_mode = TOUCH_DOWN;
-			while (!execution_finished)
-			{
-				usleep(1000);
-			}
-			std::cout << "FINISHED TOUCH DOWN" << std::endl << std::endl;
-			usleep(2000000);
-
-
-			// Cutting action execution
-			std::cout << "CUTTING" << std::endl;
-			execution_finished = false;
-			force_z_offset = EstimatedExternalCartForcesAndTorques[2];
-			setup_original_pose();
-			CommandedStiffness[2] = 15.0;
-			set_gaussian_velocity_params(0.05, 0.10);
-			calculate_guassian_param();
-			task_mode = CUTTING;
-			while (!execution_finished)
-			{
-				usleep(1000);
-			}
-			CommandedStiffness[2] = 50000;
-
-			std::cout << "FINISHED CUTTING" << std::endl << std::endl;
-			usleep(2000000);
-
-			// Going up
-			std::cout << "GOING UP" << std::endl;
-			execution_finished = false;
-			setup_touch_down(0.07, 0.05);
-			setup_original_pose();
-			std::cout << target_linear_pos[2] << " " << MeasuredPose[11] << std::endl;
-			task_mode = GO_UP;
-			while (!execution_finished)
-			{
-				usleep(1000);
-			}
-			std::cout << "FINISHED GOING UP" << std::endl << std::endl;
-			usleep(2000000);
-
-
-		}
-		usleep(1000);
-
-	}
-
-}
-
-
 //*******************************************************************************************
 // main()
 //
@@ -150,8 +48,6 @@ int main(int argc, char *argv[])
 	KDL::Frame ee_frame;
 	double roll, pitch, yaw;
 	double qx, qy, qz, qw;
-	int sec, nsec;
-
 	// ROS INITIALIZATION
 	rclcpp::init(argc, argv);
   	node = rclcpp::Node::make_shared("kuka_cartesian_control");
@@ -193,7 +89,6 @@ int main(int argc, char *argv[])
 	previous_time = (float)CycleCounter * Robot->GetCycleTime();
 	current_time = (float)CycleCounter * Robot->GetCycleTime();
 	start_time = current_time;
-	float original_pose = CommandedPose[3];
 
 	// KDL INITIALIZATION
 
@@ -212,7 +107,6 @@ int main(int argc, char *argv[])
 	calculate_guassian_param();
 
 	std::thread joint_state_pub_tread(robot_state_publisher_function);
-	std::thread state_coordinator_thread(state_coordinator);
 	// start_execution = true;
 	// task_mode = JOY_CONTROL;
 	while (((float)CycleCounter * Robot->GetCycleTime() < RUN_TIME_IN_SECONDS) and (not stop_program) and rclcpp::ok())
@@ -247,83 +141,11 @@ int main(int argc, char *argv[])
 
 		switch (task_mode)
 		{
-		case CUTTING:
-		{
-			current_time = (float)CycleCounter * Robot->GetCycleTime();
-			float x_vel = gaussian_velocity(current_time - start_time);
-			CommandedPose[7] = CommandedPose[7] - x_vel * (current_time - previous_time);
-			Robot->GetMeasuredCartPose(MeasuredPose);
-			CommandedPose[11] = MeasuredPose[11];
- 			previous_time = current_time;
-			float a = 0.0;
-			float u = 0.0;
-			float state[3];
-			state[0] = -x_vel;
-			state[1] = (LearningReferencePose[7] - MeasuredPose[7])/x_dist;
-			state[2] = (LearningReferencePose[11] - MeasuredPose[11])/z_dist;
-			policy.action(a, u, state);
-			float original_a = a;
-			// std::cout << LearningReferencePose[11] << " " << MeasuredPose[11] << " " << state[2] << " " << z_dist << std::endl;
-			float excessive_force_penalty = 0.0;
-			if (a < 0.0)
-			{
-				CommandedForcesAndTorques[2] = -1.7 ;
-			}
-			else if (a > max_force)
-			{
-				CommandedForcesAndTorques[2] = max_force;
-				a = a;
-			}
-			else
-			{
-				CommandedForcesAndTorques[2] = a;
-				a = a;
-			}
-
-			Robot->SetCommandedCartForcesAndTorques(CommandedForcesAndTorques);
-			Robot->SetCommandedCartPose(CommandedPose);
-			if (roll_out_data.size() >= 1)
-			{
-				float reward = (100 * state[2] * state[2] - 1.0 * std::pow(roll_out_data[roll_out_data.size() - 1][1], 2));
-				roll_out_data[roll_out_data.size()-1].push_back(reward);
-			}
-			single_time_step_data.clear();
-			std::cout << u << " " << a << " " << original_a << " " << EstimatedExternalCartForcesAndTorques[2] 
-									<< " " << CommandedForcesAndTorques[2] << std::endl;
- 			single_time_step_data = std::vector<float> ({u, a, state[0], state[1], state[2]});
-			roll_out_data.push_back(single_time_step_data);
-			geometry_msgs::msg::TwistStamped twist_msg_;
-			twist_msg_.header.frame_id = "base_link";
-			twist_msg_.header.stamp.sec = ros_time.seconds(); 
-			twist_msg_.header.stamp.nanosec = ros_time.nanoseconds();
-			twist_msg_.twist.linear.y = -x_vel;
-			// cart_twist_pub->publish(twist_msg_);
-			
-			geometry_msgs::msg::WrenchStamped wrench_cmd;
-			wrench_cmd.header.stamp.sec = ros_time.seconds();
-			wrench_cmd.header.stamp.nanosec = ros_time.nanoseconds();
-			wrench_cmd.wrench.force.z = a;
-			// force_command_pub.publish(wrench_cmd);
-			if ((current_time - start_time) >= (gaussian_mu + 2 * gaussian_sigma))
-			{
-				float termination_reward = 0.0;
-				if (state[2] > 0.995)
-				{
-					termination_reward = 100;
-				}
-				roll_out_data[roll_out_data.size()-1].push_back(termination_reward);
-				task_mode = IDLE;
-				execution_finished = true;
-			}
-
-		}
-			break;
 
 		case POSITIONING:
 		{
 			// std::cout << MeasuredPose[3] << " " << MeasuredPose[7] << " " << MeasuredPose[11] << " " << roll
 							// << " " << pitch << " " << yaw << std::endl;
-			float angular_setpoint = pi/4;
 			if (fabs(pitch) < 0.01 and fabs(-pi/2 - yaw) < 0.01 and fabs(fabs(-pi) - roll) < 0.01)
 			{
 				task_mode = IDLE;
@@ -370,95 +192,12 @@ int main(int argc, char *argv[])
 		}
 			break;
 
-		case GO_TO_START:
-		{
-			float velocity[3];
-			if (get_velocity(new_start_pose, velocity, 0.05))
-			{
-				task_mode = IDLE;
-				execution_finished = true;
-				std::cout << "Robot is at start position" << std::endl;
-			}
-			current_time = (float)CycleCounter * Robot->GetCycleTime();
-			CommandedPose[3] = CommandedPose[3] + velocity[0] * (current_time - previous_time);
-			CommandedPose[7] = CommandedPose[7] + velocity[1] * (current_time - previous_time);
-			CommandedPose[11] = CommandedPose[11] + velocity[2] * (current_time - previous_time);
-			previous_time = current_time;
-			Robot->SetCommandedCartPose(CommandedPose);
-		}
-			break;
-
-		case REPOSITIONING:
-		{
-			float velocity[3];
-			if (get_velocity(start_pose, velocity, 0.05))
-			{
-				task_mode = IDLE;
-				execution_finished = true;
-			}
-			current_time = (float)CycleCounter * Robot->GetCycleTime();
-			CommandedPose[3] = OriginalPose[3] + velocity[0] * (current_time - previous_time);
-			CommandedPose[7] = OriginalPose[7] + velocity[1] * (current_time - previous_time);
-			CommandedPose[11] = OriginalPose[11] + velocity[2] * (current_time - previous_time);
-			previous_time = current_time;
-			Robot->SetCommandedCartPose(CommandedPose);
-		}
-			break;
-
 		case GRAV_COMP:
 			Robot->SetCommandedCartPose(MeasuredPose);
 			current_time = (float)CycleCounter * Robot->GetCycleTime();
 			previous_time = current_time;
 			break;
 
-		case TOUCH_DOWN:
-		{
-			// std::cout << "Entered in case: " << TOUCH_DOWN << std::endl;
-			float error = target_linear_pos[2] - MeasuredPose[11];
-			if (fabs(error) < 0.001 or fabs(EstimatedExternalCartForcesAndTorques[2]) > 2.5)
-			{
-				std::cout << EstimatedExternalCartForcesAndTorques[2] << std::endl;
-				task_mode = IDLE;
-				CommandedStiffness[2] = 5.0;
-
-				execution_finished = true;
-			}
-			current_time = (float)CycleCounter * Robot->GetCycleTime();
-			if (error < 0.0)
-			{
-				CommandedPose[11] = CommandedPose[11] - max_vertical_vel * (current_time - previous_time);
-			}
-			else
-			{
-				CommandedPose[11] = CommandedPose[11] + max_vertical_vel * (current_time - previous_time);
-			}
-			previous_time = current_time;
-			Robot->SetCommandedCartPose(CommandedPose);
-		}
-			break;
-
-		case GO_UP:
-		{
-			// std::cout << "Entered in case: " << TOUCH_DOWN << std::endl;
-			float error = target_linear_pos[2] - MeasuredPose[11];
-			if (fabs(error) < 0.001)
-			{
-				task_mode = IDLE;
-				execution_finished = true;
-			}
-			current_time = (float)CycleCounter * Robot->GetCycleTime();
-			if (error < 0.0)
-			{
-				CommandedPose[11] = CommandedPose[11] - 0.05 * (current_time - previous_time);
-			}
-			else
-			{
-				CommandedPose[11] = CommandedPose[11] + 0.05 * (current_time - previous_time);
-			}
-			previous_time = current_time;
-			Robot->SetCommandedCartPose(CommandedPose);
-		}
-			break;
 
 
 		case JOY_CONTROL:
@@ -472,13 +211,11 @@ int main(int argc, char *argv[])
 			break;
 
 		case IDLE:
+		default:
 			// std::cout << "Entered in case: " << IDLE << std::endl;
 			current_time = (float)CycleCounter * Robot->GetCycleTime();
 			previous_time = current_time;
 			new_pitch = pitch, new_roll = roll, new_yaw = yaw;
-			break;
-
-		default:
 			break;
 		}
 		// Reading Robot state
@@ -505,7 +242,6 @@ int main(int argc, char *argv[])
 	delete Robot;
 	// RCLCPP_INFO("Object deleted...");
 	joint_state_pub_tread.join();
-	state_coordinator_thread.join();
 	return(EXIT_SUCCESS);
 }
 
