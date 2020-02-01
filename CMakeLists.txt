@@ -97,7 +97,7 @@ add_library(TypeIRML
 #add_executable(fri_test_node scripts/FastResearchInterfaceTest/FastResearchInterfaceTest.cpp)
 #add_executable(calibration_node scripts/FastResearchInterfaceTest/calibration.cpp scripts/FastResearchInterfaceTest/ft_calib.cpp)
 #add_executable(ros_test_node scripts/FastResearchInterfaceTest/ros_test.cpp)
-add_executable(cart_test_2_node scripts/LWRGettingStartedExamples/LWRCartImpedanceControlExample.cpp)
+add_executable(cart_test_2_node scripts/LWRGettingStartedExamples/LWR_Cart_impedence_ros.cpp)
 #add_executable(cpp_test_node scripts/LWRGettingStartedExamples/cpp_test.cpp)
 #add_executable(joint_test_node scripts/LWRGettingStartedExamples/LWRJointPositionControlExample.cpp)
 
